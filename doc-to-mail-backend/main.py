@@ -1,30 +1,31 @@
-from fastapi import FastAPI, UploadFile, File
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-import pdfplumber
+from fastapi import FastAPI, UploadFile, File, Request
+from fastapi.responses import HTMLResponse
+from fastapi.templating import Jinja2Templates
+import fitz  # PyMuPDF
 
 app = FastAPI()
+templates = Jinja2Templates(directory="templates")
 
-# CORS 허용 (Next.js 클라이언트용)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # 실제 운영 시 origin 제한하는 게 안전
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+@app.post("/upload", response_class=HTMLResponse)
+async def upload_pdf(request: Request, pdf: UploadFile = File(...)):
+    # PDF 열기
+    doc = fitz.open(stream=await pdf.read(), filetype="pdf")
+    page = doc[0]  # 첫 페이지만 대상으로
 
-@app.post("/extract-pdf-text")
-async def extract_pdf_text(file: UploadFile = File(...)):
-    contents = await file.read()
-    with open("temp.pdf", "wb") as f:
-        f.write(contents)
+    # 텍스트 + 좌표 추출
+    blocks = page.get_text("dict")["blocks"]
+    lines = []
 
-    extracted_text = ""
-    with pdfplumber.open("temp.pdf") as pdf:
-        for page in pdf.pages:
-            text = page.extract_text()
-            if text:
-                extracted_text += text + "\n\n"
+    for block in blocks:
+        if block["type"] == 0:
+            for line in block["lines"]:
+                line_text = " ".join([span["text"] for span in line["spans"]])
+                lines.append(line_text)
 
-    return JSONResponse(content={"text": extracted_text.strip()})
+    # 단순 <pre>로 구성한 HTML 본문
+    html_body = "<br>".join(lines)
+
+    return templates.TemplateResponse("preview.html", {
+        "request": request,
+        "html_body": html_body
+    })

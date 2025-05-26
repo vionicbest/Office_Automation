@@ -1,0 +1,14 @@
+<!-- templates/preview.html -->
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>메일 본문 미리보기</title>
+</head>
+<body style="font-family: 'Malgun Gothic', sans-serif;">
+  <h2>메일 본문 미리보기</h2>
+  <div style="border: 1px solid #ccc; padding: 20px; background: #f9f9f9;">
+    <pre style="white-space: pre-wrap;">{{ html_body | safe }}</pre>
+  </div>
+</body>
+</html>
