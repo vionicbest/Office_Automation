@@ -694,7 +694,7 @@ def process_pdf_blocks(doc, title, blocks, output_dir, dpi=300):
                 char_dict = page.get_text("rawdict", clip=clip)
                 char_lines = defaultdict(list)
 
-                y_tol = 8.0
+                y_tol = 12.0
                 for block in char_dict["blocks"]:
                     if "lines" not in block:
                         continue

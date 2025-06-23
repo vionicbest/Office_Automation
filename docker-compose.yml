@@ -1,0 +1,15 @@
+version: '3'
+services:
+  backend:
+    build: ./doc-to-mail-backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend_static:/app/static
+#    restart: unless-stopped
+
+  frontend:
+    build: ./doc-to-mail-frontend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped

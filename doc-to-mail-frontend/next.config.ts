@@ -5,7 +5,7 @@ const nextConfig: NextConfig = {
     return [
       {
         source: "/api/:path*", // 프론트에서 이 경로로 요청
-        destination: "http://localhost:8000/:path*", // 실제 백엔드 주소
+        destination: "http://backend:8000/:path*", // 실제 백엔드 주소
       },
     ];
   },
