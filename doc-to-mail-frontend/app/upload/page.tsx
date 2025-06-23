@@ -1,57 +1,72 @@
-'use client'
+'use client';
 
-import { useRouter } from 'next/navigation'
-import { useState, useCallback } from 'react'
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function UploadPage() {
-  const router = useRouter()
-  const [dragging, setDragging] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const router = useRouter();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleDrop = useCallback(async (e: React.DragEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    setDragging(false)
-
-    const file = e.dataTransfer.files?.[0]
-    if (!file || file.type !== 'application/pdf') {
-      alert('PDF 파일만 업로드할 수 있습니다.')
-      return
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] || null;
+    if (file && file.type !== 'application/pdf') {
+      setError('PDF 파일만 업로드할 수 있습니다.');
+      return;
     }
+    setSelectedFile(file);
+    setError(null);
+  };
 
-    setLoading(true)
-    const formData = new FormData()
-    formData.append('file', file)
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setIsUploading(true);
+    setError(null);
 
-    const res = await fetch('/api/parse-pdf', {
-      method: 'POST',
-      body: formData,
-    })
+    const formData = new FormData();
+    formData.append('file', selectedFile);
 
-    const result = await res.json()
-    localStorage.setItem('blocks', JSON.stringify(result.blocks))
-    router.push('/editor')
-  }, [router])
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error('업로드 실패');
+
+      const result = await response.json();
+      console.log('처리 결과:', result);
+      router.push(`/editor/${result.docId}`);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
-    <main className="p-8">
-      <h1 className="text-2xl font-bold mb-4">PDF 드래그 앤 드롭</h1>
+    <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <h1 className="text-2xl font-bold mb-6">📄 공문 업로드</h1>
 
-      <div
-        onDragOver={(e) => {
-          e.preventDefault()
-          setDragging(true)
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={handleDrop}
-        className={`border-2 border-dashed p-12 rounded text-center transition-all ${
-          dragging ? 'bg-blue-50 border-blue-400' : 'bg-white border-gray-300'
-        }`}
+      <label className="mb-4 cursor-pointer px-4 py-2 bg-gray-100 border border-gray-300 rounded hover:bg-gray-200 text-sm">
+        {selectedFile ? selectedFile.name : '📎 PDF 파일 선택'}
+        <input
+          type="file"
+          accept="application/pdf"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </label>
+
+      {error && <p className="text-red-500 mb-2">{error}</p>}
+      <button
+        onClick={handleUpload}
+        disabled={!selectedFile || isUploading}
+        className="bg-blue-600 text-white px-4 py-2 rounded disabled:opacity-50"
       >
-        {loading
-          ? <p className="text-blue-500">업로드 중입니다...</p>
-          : <p className="text-gray-500">여기에 PDF 파일을 드래그 앤 드롭하세요</p>
-        }
-      </div>
-    </main>
-  )
+        {isUploading ? '업로드 중...' : '변환 시작'}
+      </button>
+    </div>
+  );
 }

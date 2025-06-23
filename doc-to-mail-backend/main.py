@@ -1,31 +1,41 @@
-from fastapi import FastAPI, UploadFile, File, Request
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import FastAPI, UploadFile, File, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 import fitz  # PyMuPDF
+from split_pdf import save_pdf_blocks
+from util import generate_doc_id_from_bytes, collect_blocks
 
 app = FastAPI()
-templates = Jinja2Templates(directory="templates")
 
-@app.post("/upload", response_class=HTMLResponse)
-async def upload_pdf(request: Request, pdf: UploadFile = File(...)):
-    # PDF 열기
-    doc = fitz.open(stream=await pdf.read(), filetype="pdf")
-    page = doc[0]  # 첫 페이지만 대상으로
+app.mount("/static", StaticFiles(directory="static"), name="static")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "https://wise-pots-lick.loca.lt/"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-    # 텍스트 + 좌표 추출
-    blocks = page.get_text("dict")["blocks"]
-    lines = []
+@app.post("/upload")
+async def upload_pdf(file: UploadFile = File(...)):
+    pdf_bytes = await file.read()
 
-    for block in blocks:
-        if block["type"] == 0:
-            for line in block["lines"]:
-                line_text = " ".join([span["text"] for span in line["spans"]])
-                lines.append(line_text)
+    doc_id = generate_doc_id_from_bytes(pdf_bytes)
 
-    # 단순 <pre>로 구성한 HTML 본문
-    html_body = "<br>".join(lines)
+    save_pdf_blocks(pdf_bytes, doc_id)
+    print(123)
 
-    return templates.TemplateResponse("preview.html", {
-        "request": request,
-        "html_body": html_body
-    })
+    return {"docId": doc_id}
+
+
+@app.get("/api/docs/{docId}")
+def get_document(doc_id: str):
+    try:
+        blocks = collect_blocks(doc_id)
+        return {
+            "docId": doc_id,
+            "blocks": blocks
+        }
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Document not found")
